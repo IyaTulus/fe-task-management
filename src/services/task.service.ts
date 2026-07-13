@@ -1,16 +1,126 @@
-import type { Task, TaskWithValues, GetTasksParams, PaginatedResponse } from "../types";
+import type { FormEntry, PaginatedResponse, GetEntriesParams } from "../types";
 
-const sampleTasks: TaskWithValues[] = [
-    { id: "1", title: "Website Redesign", description: "Redesign company website with new branding", status: "in-progress", createdAt: "2024-02-01", updatedAt: "2024-02-10", fieldValues: {} },
-    { id: "2", title: "API Integration", description: "Integrate third-party payment API", status: "completed", createdAt: "2024-02-02", updatedAt: "2024-02-10", fieldValues: {} },
-    { id: "3", title: "Database Migration", description: "Migrate from MySQL to PostgreSQL", status: "in-progress", createdAt: "2024-02-03", updatedAt: "2024-02-15", fieldValues: {} },
-    { id: "4", title: "UI Testing", description: "Write comprehensive UI tests", status: "todo", createdAt: "2024-02-04", updatedAt: "2024-02-04", fieldValues: {} },
-    { id: "5", title: "Performance Optimization", description: "Optimize database queries and caching", status: "in-progress", createdAt: "2024-02-05", updatedAt: "2024-02-12", fieldValues: {} },
-    { id: "6", title: "Documentation Update", description: "Update API documentation", status: "completed", createdAt: "2024-02-06", updatedAt: "2024-02-08", fieldValues: {} },
-    { id: "7", title: "Security Audit", description: "Conduct security review", status: "todo", createdAt: "2024-02-07", updatedAt: "2024-02-07", fieldValues: {} },
-    { id: "8", title: "Code Review", description: "Review pull requests", status: "in-progress", createdAt: "2024-02-08", updatedAt: "2024-02-15", fieldValues: {} },
-    { id: "9", title: "Deployment Setup", description: "Setup CI/CD pipeline", status: "completed", createdAt: "2024-02-09", updatedAt: "2024-02-05", fieldValues: {} },
-    { id: "10", title: "User Feedback Analysis", description: "Analyze user feedback and create report", status: "todo", createdAt: "2024-02-10", updatedAt: "2024-02-10", fieldValues: {} },
+const sampleEntries: FormEntry[] = [
+    {
+        id: "entry-1",
+        form_id: 1,
+        values: {
+            "Task Name": "Website Redesign",
+            Description: "Redesign company website with new branding",
+            Status: "In Progress",
+            Priority: "High",
+        },
+        createdat: "2024-02-01T00:00:00Z",
+        updatedat: "2024-02-10T00:00:00Z",
+    },
+    {
+        id: "entry-2",
+        form_id: 1,
+        values: {
+            "Task Name": "API Integration",
+            Description: "Integrate third-party payment API",
+            Status: "Completed",
+            Priority: "Medium",
+        },
+        createdat: "2024-02-02T00:00:00Z",
+        updatedat: "2024-02-10T00:00:00Z",
+    },
+    {
+        id: "entry-3",
+        form_id: 1,
+        values: {
+            "Task Name": "Database Migration",
+            Description: "Migrate from MySQL to PostgreSQL",
+            Status: "In Progress",
+            Priority: "High",
+        },
+        createdat: "2024-02-03T00:00:00Z",
+        updatedat: "2024-02-15T00:00:00Z",
+    },
+    {
+        id: "entry-4",
+        form_id: 1,
+        values: {
+            "Task Name": "UI Testing",
+            Description: "Write comprehensive UI tests",
+            Status: "Not Started",
+            Priority: "Low",
+        },
+        createdat: "2024-02-04T00:00:00Z",
+        updatedat: "2024-02-04T00:00:00Z",
+    },
+    {
+        id: "entry-5",
+        form_id: 1,
+        values: {
+            "Task Name": "Performance Optimization",
+            Description: "Optimize database queries and caching",
+            Status: "In Progress",
+            Priority: "High",
+        },
+        createdat: "2024-02-05T00:00:00Z",
+        updatedat: "2024-02-12T00:00:00Z",
+    },
+    {
+        id: "entry-6",
+        form_id: 1,
+        values: {
+            "Task Name": "Documentation Update",
+            Description: "Update API documentation",
+            Status: "Completed",
+            Priority: "Medium",
+        },
+        createdat: "2024-02-06T00:00:00Z",
+        updatedat: "2024-02-08T00:00:00Z",
+    },
+    {
+        id: "entry-7",
+        form_id: 1,
+        values: {
+            "Task Name": "Security Audit",
+            Description: "Conduct security review",
+            Status: "Not Started",
+            Priority: "High",
+        },
+        createdat: "2024-02-07T00:00:00Z",
+        updatedat: "2024-02-07T00:00:00Z",
+    },
+    {
+        id: "entry-8",
+        form_id: 1,
+        values: {
+            "Task Name": "Code Review",
+            Description: "Review pull requests",
+            Status: "In Progress",
+            Priority: "Medium",
+        },
+        createdat: "2024-02-08T00:00:00Z",
+        updatedat: "2024-02-15T00:00:00Z",
+    },
+    {
+        id: "entry-9",
+        form_id: 1,
+        values: {
+            "Task Name": "Deployment Setup",
+            Description: "Setup CI/CD pipeline",
+            Status: "Completed",
+            Priority: "Low",
+        },
+        createdat: "2024-02-09T00:00:00Z",
+        updatedat: "2024-02-05T00:00:00Z",
+    },
+    {
+        id: "entry-10",
+        form_id: 1,
+        values: {
+            "Task Name": "User Feedback Analysis",
+            Description: "Analyze user feedback and create report",
+            Status: "Not Started",
+            Priority: "Medium",
+        },
+        createdat: "2024-02-10T00:00:00Z",
+        updatedat: "2024-02-10T00:00:00Z",
+    },
 ];
 
 const USE_MOCK = true;
@@ -18,26 +128,28 @@ const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export const taskService = {
-    async getTasks(params: GetTasksParams = {}): Promise<PaginatedResponse<TaskWithValues>> {
+// Helper to generate unique ID
+const generateId = () => `entry-${Date.now()}`;
+
+export const entryService = {
+    async getEntries(params: GetEntriesParams = {}): Promise<PaginatedResponse<FormEntry>> {
         if (USE_MOCK) {
             await delay(500);
-            const { page = 1, pageSize = 10, search = "", status } = params;
+            const { page = 1, pageSize = 10, search = "" } = params;
 
-            let filtered = [...sampleTasks];
+            let filtered = [...sampleEntries];
 
+            // Search in all values
             if (search) {
-                filtered = filtered.filter(
-                    (task) =>
-                        task.title.toLowerCase().includes(search.toLowerCase()) ||
-                        task.description.toLowerCase().includes(search.toLowerCase())
+                const searchLower = search.toLowerCase();
+                filtered = filtered.filter((entry) =>
+                    Object.values(entry.values).some((val) =>
+                        String(val).toLowerCase().includes(searchLower)
+                    )
                 );
             }
 
-            if (status && status !== "all") {
-                filtered = filtered.filter((task) => task.status === status);
-            }
-
+            // Pagination
             const total = filtered.length;
             const totalPages = Math.ceil(total / pageSize);
             const start = (page - 1) * pageSize;
@@ -51,20 +163,19 @@ export const taskService = {
         if (params.page) query.set("page", String(params.page));
         if (params.pageSize) query.set("pageSize", String(params.pageSize));
         if (params.search) query.set("search", params.search);
-        if (params.status) query.set("status", params.status);
 
-        const response = await fetch(`${API_BASE}/tasks?${query.toString()}`);
+        const response = await fetch(`${API_BASE}/value_form?${query.toString()}`);
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         return response.json();
     },
 
-    async getTask(id: string): Promise<TaskWithValues | null> {
+    async getEntry(id: string): Promise<FormEntry | null> {
         if (USE_MOCK) {
             await delay(300);
-            return sampleTasks.find((task) => task.id === id) || null;
+            return sampleEntries.find((e) => e.id === id) || null;
         }
 
-        const response = await fetch(`${API_BASE}/tasks/${id}`);
+        const response = await fetch(`${API_BASE}/value_form/${id}`);
         if (!response.ok) {
             if (response.status === 404) return null;
             throw new Error(`HTTP error! status: ${response.status}`);
@@ -72,21 +183,20 @@ export const taskService = {
         return response.json();
     },
 
-    async createTask(data: Omit<Task, "id" | "createdAt" | "updatedAt">): Promise<TaskWithValues> {
+    async createEntry(data: Omit<FormEntry, "id" | "createdat" | "updatedat">): Promise<FormEntry> {
         if (USE_MOCK) {
             await delay(500);
-            const newTask: TaskWithValues = {
+            const newEntry: FormEntry = {
                 ...data,
-                id: String(Date.now()),
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-                fieldValues: {},
+                id: generateId(),
+                createdat: new Date().toISOString(),
+                updatedat: new Date().toISOString(),
             };
-            sampleTasks.unshift(newTask);
-            return newTask;
+            sampleEntries.unshift(newEntry);
+            return newEntry;
         }
 
-        const response = await fetch(`${API_BASE}/tasks`, {
+        const response = await fetch(`${API_BASE}/value_form`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(data),
@@ -95,17 +205,21 @@ export const taskService = {
         return response.json();
     },
 
-    async updateTask(id: string, data: Partial<Task>): Promise<TaskWithValues> {
+    async updateEntry(id: string, data: Partial<Omit<FormEntry, "id" | "createdat" | "updatedat">>): Promise<FormEntry> {
         if (USE_MOCK) {
             await delay(500);
-            const index = sampleTasks.findIndex((task) => task.id === id);
-            if (index === -1) throw new Error("Task tidak ditemukan");
+            const index = sampleEntries.findIndex((e) => e.id === id);
+            if (index === -1) throw new Error("Entry tidak ditemukan");
 
-            sampleTasks[index] = { ...sampleTasks[index], ...data, updatedAt: new Date().toISOString() };
-            return sampleTasks[index];
+            sampleEntries[index] = {
+                ...sampleEntries[index],
+                ...data,
+                updatedat: new Date().toISOString(),
+            };
+            return sampleEntries[index];
         }
 
-        const response = await fetch(`${API_BASE}/tasks/${id}`, {
+        const response = await fetch(`${API_BASE}/value_form/${id}`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(data),
@@ -114,48 +228,29 @@ export const taskService = {
         return response.json();
     },
 
-    async updateTaskStatus(id: string, status: Task["status"]): Promise<TaskWithValues> {
+    async deleteEntry(id: string): Promise<void> {
         if (USE_MOCK) {
             await delay(300);
-            const index = sampleTasks.findIndex((task) => task.id === id);
-            if (index === -1) throw new Error("Task tidak ditemukan");
-
-            sampleTasks[index] = { ...sampleTasks[index], status, updatedAt: new Date().toISOString() };
-            return sampleTasks[index];
-        }
-
-        const response = await fetch(`${API_BASE}/tasks/${id}/status`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ status }),
-        });
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        return response.json();
-    },
-
-    async deleteTask(id: string): Promise<void> {
-        if (USE_MOCK) {
-            await delay(300);
-            const index = sampleTasks.findIndex((task) => task.id === id);
-            if (index !== -1) sampleTasks.splice(index, 1);
+            const index = sampleEntries.findIndex((e) => e.id === id);
+            if (index !== -1) sampleEntries.splice(index, 1);
             return;
         }
 
-        const response = await fetch(`${API_BASE}/tasks/${id}`, { method: "DELETE" });
+        const response = await fetch(`${API_BASE}/value_form/${id}`, { method: "DELETE" });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
     },
 
-    async deleteTasks(ids: string[]): Promise<void> {
+    async deleteEntries(ids: string[]): Promise<void> {
         if (USE_MOCK) {
             await delay(500);
             ids.forEach((id) => {
-                const index = sampleTasks.findIndex((task) => task.id === id);
-                if (index !== -1) sampleTasks.splice(index, 1);
+                const index = sampleEntries.findIndex((e) => e.id === id);
+                if (index !== -1) sampleEntries.splice(index, 1);
             });
             return;
         }
 
-        const response = await fetch(`${API_BASE}/tasks/batch-delete`, {
+        const response = await fetch(`${API_BASE}/value_form/batch-delete`, {
             method: "DELETE",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ ids }),
@@ -163,3 +258,6 @@ export const taskService = {
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
     },
 };
+
+// Backward compatibility alias
+export const taskService = entryService;

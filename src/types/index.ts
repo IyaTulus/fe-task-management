@@ -1,45 +1,55 @@
-// Konfigurasi Kolom Formulir (Sumber Kebenaran Tunggal)
-export interface FormField {
-    id: string;
-    name: string; // Nama tampilan (sumber kebenaran tunggal)
-    type: FieldType;
-    order: number; // Urutan tampil
-    row: number; // Posisi baris untuk layout formulir
-    column: 1 | 2; // Posisi kolom (1-2, maks 2 per baris)
-    isRequired: boolean;
-    showInCreate: boolean; // Tampilkan di formulir tambah
-    showInEdit: boolean; // Tampilkan di formulir ubah
-    showInList: boolean; // Tampilkan di daftar tugas (kolom tabel)
+// ============================================
+// form_tb - Konfigurasi Kolom (Column Definitions)
+// ============================================
+export interface FormConfig {
+    id: number;
+    name: string;           // Nama kolom
+    type: FieldType;        // "text" | "datetime" | "email"
+    order: number;          // Urutan tampil di tabel
+    isRequired: boolean;     // Wajib diisi atau tidak
+    createdat: string;
+    updatedat: string;
 }
 
-export type FieldType = "text" | "date" | "email" | "select" | "textarea";
+export type FieldType = "text" | "datetime" | "email";
 
-// Nilai Kolom Dinamis per Tugas
-export interface TaskFieldValue {
-    id: string;
-    taskId: string;
-    fieldId: string;
-    value: string;
+// ============================================
+// value_form - Data Baris (Row Data)
+// ============================================
+export interface FormEntry {
+    id: string;                             // Unique identifier (e.g., "entry-001")
+    form_id: number;                        // Referensi ke form_tb
+    values: Record<string, string | boolean>; // fieldName -> value (JSON)
+    createdat: string;
+    updatedat: string;
 }
 
-// Tugas (Bidang Tetap)
-export interface Task {
-    id: string;
-    title: string;
-    description: string;
-    status: TaskStatus;
-    createdAt: string;
-    updatedAt: string;
+// ============================================
+// Alias untuk backward compatibility
+// ============================================
+export type FormField = FormConfig;
+export type Task = FormEntry;
+export type TaskWithValues = FormEntry;
+export type TaskFieldValue = never; // Tidak dipakai lagi
+
+// ============================================
+// Payload untuk create/update
+// ============================================
+export interface FormEntryPayload {
+    form_id: number;
+    values: Record<string, string | boolean>;
 }
 
-export type TaskStatus = "todo" | "in-progress" | "completed";
-
-// Tugas Terlampir dengan nilai kolom dinamis untuk tampilan tabel
-export interface TaskWithValues extends Task {
-    fieldValues: Record<string, string>; // fieldId -> nilai
+// ============================================
+// Form values untuk UI
+// ============================================
+export interface FormEntryFormValues {
+    values: Record<string, string | boolean>;
 }
 
+// ============================================
 // Tipe respons API
+// ============================================
 export interface PaginatedResponse<T> {
     data: T[];
     meta: {
@@ -50,9 +60,18 @@ export interface PaginatedResponse<T> {
     };
 }
 
-export interface GetTasksParams {
+export interface GetEntriesParams {
     page?: number;
     pageSize?: number;
     search?: string;
-    status?: string | null;
+    // filter lain bisa ditambahkan di sini
 }
+
+// ============================================
+// Konstanta Built-in Fields
+// ============================================
+export const BUILTIN_FIELDS: FormConfig[] = [
+    { id: 1, name: "Task Name", type: "text", order: 1, isRequired: true, createdat: "", updatedat: "" },
+    { id: 2, name: "Description", type: "text", order: 2, isRequired: false, createdat: "", updatedat: "" },
+    { id: 3, name: "Status", type: "text", order: 3, isRequired: false, createdat: "", updatedat: "" },
+];

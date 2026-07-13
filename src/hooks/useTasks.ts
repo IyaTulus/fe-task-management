@@ -1,10 +1,10 @@
 import { useState, useCallback } from "react";
-import { taskService } from "../services/task.service";
-import type { Task, TaskWithValues, GetTasksParams } from "../types";
+import { entryService } from "../services/task.service";
+import type { FormEntry, GetEntriesParams } from "../types";
 
-interface UseTasksReturn {
+interface UseEntriesReturn {
     // State
-    tasks: TaskWithValues[];
+    entries: FormEntry[];
     loading: boolean;
     error: string | null;
     totalCount: number;
@@ -13,19 +13,19 @@ interface UseTasksReturn {
     totalPages: number;
 
     // Functions
-    fetchTasks: (params?: GetTasksParams) => Promise<void>;
-    createTask: (data: Omit<Task, "id" | "createdAt" | "updatedAt">) => Promise<TaskWithValues>;
-    updateTask: (id: string, data: Partial<Task>) => Promise<TaskWithValues>;
-    deleteTask: (id: string) => Promise<void>;
+    fetchEntries: (params?: GetEntriesParams) => Promise<void>;
+    createEntry: (data: Omit<FormEntry, "id" | "createdat" | "updatedat">) => Promise<FormEntry>;
+    updateEntry: (id: string, data: Partial<Omit<FormEntry, "id" | "createdat" | "updatedat">>) => Promise<FormEntry>;
+    deleteEntry: (id: string) => Promise<void>;
 
     // Pagination helpers
     setPage: (page: number) => void;
     setPageSize: (size: number) => void;
 }
 
-export function useTasks(): UseTasksReturn {
+export function useEntries(): UseEntriesReturn {
     // State
-    const [tasks, setTasks] = useState<TaskWithValues[]>([]);
+    const [entries, setEntries] = useState<FormEntry[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [totalCount, setTotalCount] = useState(0);
@@ -34,14 +34,14 @@ export function useTasks(): UseTasksReturn {
 
     const totalPages = Math.ceil(totalCount / pageSize);
 
-    // Fetch tasks
-    const fetchTasks = useCallback(async (params?: GetTasksParams) => {
+    // Fetch entries
+    const fetchEntries = useCallback(async (params?: GetEntriesParams) => {
         setLoading(true);
         setError(null);
 
         try {
-            const response = await taskService.getTasks({ page, pageSize, ...params });
-            setTasks(response.data);
+            const response = await entryService.getEntries({ page, pageSize, ...params });
+            setEntries(response.data);
             setTotalCount(response.meta.total);
         } catch (err) {
             setError(err instanceof Error ? err.message : "Gagal mengambil data");
@@ -50,52 +50,52 @@ export function useTasks(): UseTasksReturn {
         }
     }, [page, pageSize]);
 
-    // Create task
-    const createTask = useCallback(async (data: Omit<Task, "id" | "createdAt" | "updatedAt">) => {
+    // Create entry
+    const createEntry = useCallback(async (data: Omit<FormEntry, "id" | "createdat" | "updatedat">) => {
         setLoading(true);
         setError(null);
 
         try {
-            const newTask = await taskService.createTask(data);
-            setTasks((prev) => [newTask, ...prev]);
+            const newEntry = await entryService.createEntry(data);
+            setEntries((prev) => [newEntry, ...prev]);
             setTotalCount((prev) => prev + 1);
-            return newTask;
+            return newEntry;
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Gagal membuat task");
+            setError(err instanceof Error ? err.message : "Gagal membuat entry");
             throw err;
         } finally {
             setLoading(false);
         }
     }, []);
 
-    // Update task
-    const updateTask = useCallback(async (id: string, data: Partial<Task>) => {
+    // Update entry
+    const updateEntry = useCallback(async (id: string, data: Partial<Omit<FormEntry, "id" | "createdat" | "updatedat">>) => {
         setLoading(true);
         setError(null);
 
         try {
-            const updatedTask = await taskService.updateTask(id, data);
-            setTasks((prev) => prev.map((t) => (t.id === id ? updatedTask : t)));
-            return updatedTask;
+            const updatedEntry = await entryService.updateEntry(id, data);
+            setEntries((prev) => prev.map((e) => (e.id === id ? updatedEntry : e)));
+            return updatedEntry;
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Gagal mengupdate task");
+            setError(err instanceof Error ? err.message : "Gagal mengupdate entry");
             throw err;
         } finally {
             setLoading(false);
         }
     }, []);
 
-    // Delete task
-    const deleteTask = useCallback(async (id: string) => {
+    // Delete entry
+    const deleteEntry = useCallback(async (id: string) => {
         setLoading(true);
         setError(null);
 
         try {
-            await taskService.deleteTask(id);
-            setTasks((prev) => prev.filter((t) => t.id !== id));
+            await entryService.deleteEntry(id);
+            setEntries((prev) => prev.filter((e) => e.id !== id));
             setTotalCount((prev) => prev - 1);
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Gagal menghapus task");
+            setError(err instanceof Error ? err.message : "Gagal menghapus entry");
             throw err;
         } finally {
             setLoading(false);
@@ -103,18 +103,21 @@ export function useTasks(): UseTasksReturn {
     }, []);
 
     return {
-        tasks,
+        entries,
         loading,
         error,
         totalCount,
         page,
         pageSize,
         totalPages,
-        fetchTasks,
-        createTask,
-        updateTask,
-        deleteTask,
+        fetchEntries,
+        createEntry,
+        updateEntry,
+        deleteEntry,
         setPage,
         setPageSize,
     };
 }
+
+// Backward compatibility alias
+export const useTasks = useEntries;

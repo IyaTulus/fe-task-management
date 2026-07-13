@@ -24,7 +24,7 @@ import {
     ChevronRight24Filled,
     Dismiss16Regular,
 } from "@fluentui/react-icons";
-import type { FormField, Task, TaskWithValues, TaskStatus } from "../../types";
+import type { FormConfig, FormEntry } from "../../types";
 
 const formatDate = (dateString: string): string => {
     const date = new Date(dateString);
@@ -35,37 +35,17 @@ const formatDate = (dateString: string): string => {
     });
 };
 
-const getStatusBadgeColor = (status: TaskStatus): "informative" | "success" | "subtle" => {
-    switch (status) {
-        case "in-progress":
-            return "informative";
-        case "completed":
-            return "success";
-        case "todo":
-        default:
-            return "subtle";
-    }
+const getStatusBadgeColor = (status: string): "success" | "subtle" => {
+    return status === "Completed" ? "success" : "subtle";
 };
 
-const getStatusLabel = (status: TaskStatus): string => {
-    switch (status) {
-        case "in-progress":
-            return "In Progress";
-        case "completed":
-            return "Completed";
-        case "todo":
-        default:
-            return "To Do";
-    }
-};
+const tableHeaderClasses = "bg-[#f5f5f5] font-semibold text-[#605e5c] text-xs uppercase tracking-wide text-left";
+const tableCellClasses = "text-sm text-[#323130]";
 
 interface TaskTableProps {
     // Data
-    tasks?: TaskWithValues[];
-    fieldValues?: Record<string, Record<string, string>>;
-
-    // Column configuration (dari form_fields)
-    columns?: FormField[];
+    entries?: FormEntry[];
+    columns?: FormConfig[];
 
     // Pagination
     totalCount?: number;
@@ -73,88 +53,51 @@ interface TaskTableProps {
     pageSize?: number;
     loading?: boolean;
 
-    // Filters
-    enableStatusFilter?: boolean;
-    enablePriorityFilter?: boolean;
-
     // Callbacks
     onPageChange?: (page: number) => void;
     onPageSizeChange?: (pageSize: number) => void;
     onSearch?: (query: string) => void;
-    onStatusFilter?: (status: string | null) => void;
-    onEdit?: (task: Task) => void;
-    onDelete?: (task: Task) => void;
+    onEdit?: (entry: FormEntry) => void;
+    onDelete?: (entry: FormEntry) => void;
     onSelectionChange?: (selectedIds: string[]) => void;
 }
 
-type StatusFilter = "all" | TaskStatus;
-
-const tableHeaderClasses = "bg-[#f5f5f5] font-semibold text-[#605e5c] text-xs uppercase tracking-wide text-left";
-const tableCellClasses = "text-sm text-[#323130]";
 export default function TaskTable({
-    tasks = [],
+    entries = [],
     columns = [],
-    totalCount = 10,
+    totalCount = 0,
     page = 1,
     pageSize = 10,
     loading = false,
-    enableStatusFilter = true,
     onPageChange,
     onPageSizeChange,
     onSearch,
-    onStatusFilter,
     onEdit,
     onDelete,
     onSelectionChange,
 }: TaskTableProps) {
     // Local state
     const [searchQuery, setSearchQuery] = useState("");
-    const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [localPageSize, setLocalPageSize] = useState(pageSize);
 
     const tableColumns = useMemo(() => {
-        return columns
-            .filter((col) => col.showInList) // Hanya yang showInList
-            .sort((a, b) => a.order - b.order); // Sort by order
+        return [...columns].sort((a, b) => a.order - b.order);
     }, [columns]);
-
-    const filteredTasks = useMemo(() => {
-        return tasks.filter((task) => {
-            // Search filter
-            const matchesSearch =
-                searchQuery === "" ||
-                task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                task.description.toLowerCase().includes(searchQuery.toLowerCase());
-
-            // Status filter
-            const matchesStatus = statusFilter === "all" || task.status === statusFilter;
-
-            return matchesSearch && matchesStatus;
-        });
-    }, [tasks, searchQuery, statusFilter]);
 
     const handleSearch = (value: string) => {
         setSearchQuery(value);
         onSearch?.(value);
     };
 
-    const handleStatusFilter = (_event: React.SyntheticEvent, data: { optionValue?: string }) => {
-        const value = data.optionValue as StatusFilter;
-        setStatusFilter(value);
-        onStatusFilter?.(value === "all" ? null : value);
-    };
-
     const handleClearFilters = () => {
         setSearchQuery("");
-        setStatusFilter("all");
         onSearch?.("");
-        onStatusFilter?.(null);
     };
 
     const handleSelectAll = (checked: boolean) => {
         if (checked) {
-            const allIds = new Set(filteredTasks.map((t) => t.id));
+            const allIds = new Set(entries.map((e) => e.id));
             setSelectedIds(allIds);
             onSelectionChange?.(Array.from(allIds));
         } else {
@@ -194,66 +137,64 @@ export default function TaskTable({
         }
     };
 
-    const renderCell = (field: FormField, task: TaskWithValues) => {
-        // Get value dari task field atau dari fieldValues
-        const value = task[field.id as keyof TaskWithValues] as string | undefined;
+    const renderCell = (column: FormConfig, entry: FormEntry) => {
+        const value = entry.values[column.name];
 
-        switch (field.type) {
-            case "date":
-                return (
-                    <span className={tableCellClasses}>
-                        {value ? formatDate(value) : "-"}
-                    </span>
-                );
-
-            case "email":
-                return value ? (
-                    <Link href={`mailto:${value}`}>{value}</Link>
-                ) : (
-                    <span className="text-[#a19f9d]">-</span>
-                );
-
-            case "select":
-                if (field.id === "status") {
-                    return (
-                        <Badge
-                            className="rounded-full px-3 py-0.5 text-xs font-medium"
-                            appearance="filled"
-                            color={getStatusBadgeColor(task.status)}
-                        >
-                            {getStatusLabel(task.status)}
-                        </Badge>
-                    );
-                }
-                return (
-                    <span className={tableCellClasses}>{value || "-"}</span>
-                );
-
-            case "textarea":
-                return (
-                    <span className={`${tableCellClasses} line-clamp-2 max-w-xs`}>
-                        {value || "-"}
-                    </span>
-                );
-
-            case "text":
-            default:
+        switch (column.name) {
+            case "Task Name":
                 return (
                     <span className={`${tableCellClasses} font-medium`}>
-                        {value || "-"}
+                        {String(value ?? "-")}
+                    </span>
+                );
+
+            case "Description":
+                return (
+                    <span className={`${tableCellClasses} line-clamp-2 max-w-xs`}>
+                        {String(value ?? "-")}
+                    </span>
+                );
+
+            case "Status":
+                return (
+                    <Badge
+                        className="rounded-full px-3 py-0.5 text-xs font-medium"
+                        appearance="filled"
+                        color={getStatusBadgeColor(String(value))}
+                    >
+                        {String(value ?? "-")}
+                    </Badge>
+                );
+
+            case "Created At":
+            case "Updated At":
+                return (
+                    <span className={tableCellClasses}>
+                        {value ? formatDate(String(value)) : "-"}
+                    </span>
+                );
+
+            default:
+                // Dynamic fields
+                if (column.type === "email" && value) {
+                    return <Link href={`mailto:${value}`}>{String(value)}</Link>;
+                }
+                return (
+                    <span className={tableCellClasses}>
+                        {value !== undefined && value !== "" ? String(value) : "-"}
                     </span>
                 );
         }
     };
 
-    const hasActiveFilters = searchQuery !== "" || statusFilter !== "all";
-    const startItem = (page - 1) * localPageSize + 1;
+    const hasActiveFilters = searchQuery !== "";
+    const startItem = Math.min((page - 1) * localPageSize + 1, totalCount);
     const endItem = Math.min(page * localPageSize, totalCount);
 
     return (
         <div className="flex flex-col gap-4">
+            {/* Search Bar */}
             <div className="flex flex-wrap px-3 items-center gap-3">
-                {/* Search */}
                 <div className="w-64">
                     <Input
                         contentBefore={<Search24Regular />}
@@ -264,24 +205,6 @@ export default function TaskTable({
                     />
                 </div>
 
-                {enableStatusFilter && (
-                    <Dropdown
-                        placeholder="All Status"
-                        value={
-                            statusFilter === "all"
-                                ? "All Status"
-                                : getStatusLabel(statusFilter as TaskStatus)
-                        }
-                        onOptionSelect={handleStatusFilter}
-                        className="w-40"
-                    >
-                        <Option value="all">All Status</Option>
-                        <Option value="todo">To Do</Option>
-                        <Option value="in-progress">In Progress</Option>
-                        <Option value="completed">Completed</Option>
-                    </Dropdown>
-                )}
-
                 {hasActiveFilters && (
                     <Button appearance="subtle" icon={<Dismiss16Regular />} onClick={handleClearFilters}>
                         Clear filters
@@ -289,6 +212,7 @@ export default function TaskTable({
                 )}
             </div>
 
+            {/* Table */}
             <div className="overflow-x-auto border border-[#e0e0e0]">
                 <table className="w-full border-collapse bg-white">
                     <thead>
@@ -296,8 +220,8 @@ export default function TaskTable({
                             <th className="w-12 px-4 py-3 text-left">
                                 <Checkbox
                                     checked={
-                                        filteredTasks.length > 0 &&
-                                        selectedIds.size === filteredTasks.length
+                                        entries.length > 0 &&
+                                        selectedIds.size === entries.length
                                     }
                                     onChange={(_e, data) => handleSelectAll(!!data.checked)}
                                 />
@@ -319,29 +243,28 @@ export default function TaskTable({
                                     <Spinner />
                                 </td>
                             </tr>
-                        ) : filteredTasks.length === 0 ? (
+                        ) : entries.length === 0 ? (
                             <tr>
                                 <td
                                     colSpan={tableColumns.length + 2}
                                     className="px-4 py-8 text-center text-[#605e5c]"
                                 >
-                                    <Text>No tasks found</Text>
+                                    <Text>No data found</Text>
                                 </td>
                             </tr>
                         ) : (
-                            filteredTasks.map((task) => (
-                                <tr key={task.id} className="border-t border-[#e0e0e0] hover:bg-[#f5f5f5]">
-
+                            entries.map((entry) => (
+                                <tr key={entry.id} className="border-t border-[#e0e0e0] hover:bg-[#f5f5f5]">
                                     <td className="px-4 py-3">
                                         <Checkbox
-                                            checked={selectedIds.has(task.id)}
-                                            onChange={(_e, data) => handleSelectRow(task.id, !!data.checked)}
+                                            checked={selectedIds.has(entry.id)}
+                                            onChange={(_e, data) => handleSelectRow(entry.id, !!data.checked)}
                                         />
                                     </td>
 
                                     {tableColumns.map((col) => (
                                         <td key={col.id} className="px-4 py-3">
-                                            {renderCell(col, task)}
+                                            {renderCell(col, entry)}
                                         </td>
                                     ))}
 
@@ -360,13 +283,13 @@ export default function TaskTable({
                                                     <MenuList>
                                                         <MenuItem
                                                             icon={<Edit16Regular />}
-                                                            onClick={() => onEdit?.(task)}
+                                                            onClick={() => onEdit?.(entry)}
                                                         >
                                                             Edit
                                                         </MenuItem>
                                                         <MenuItem
                                                             icon={<Delete16Regular />}
-                                                            onClick={() => onDelete?.(task)}
+                                                            onClick={() => onDelete?.(entry)}
                                                         >
                                                             Delete
                                                         </MenuItem>
@@ -382,23 +305,24 @@ export default function TaskTable({
                 </table>
             </div>
 
+            {/* Pagination */}
             <div className="flex items-center px-3 justify-between">
                 <span className="text-xs text-[#605e5c]">
-                    Showing {startItem}-{endItem} of {totalCount} results
+                    Showing {totalCount > 0 ? `${startItem}-${endItem}` : "0"} of {totalCount} results
                 </span>
                 <div className="flex items-center gap-2">
                     <Button
                         appearance="subtle"
                         icon={<ChevronLeft24Regular />}
                         onClick={handlePrevPage}
-                        disabled={page === 1}
+                        disabled={page === 1 || totalCount === 0}
                         aria-label="Previous page"
                     />
                     <Button
                         appearance="subtle"
                         icon={<ChevronRight24Filled />}
                         onClick={handleNextPage}
-                        disabled={page >= Math.ceil(totalCount / localPageSize)}
+                        disabled={page >= Math.ceil(totalCount / localPageSize) || totalCount === 0}
                         aria-label="Next page"
                     />
                 </div>

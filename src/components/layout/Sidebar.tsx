@@ -1,4 +1,5 @@
 
+import type { ReactElement } from "react";
 import { ClipboardTask24Regular, Settings24Regular, ChevronDown16Regular } from "@fluentui/react-icons";
 import {
     Avatar,
@@ -10,7 +11,7 @@ import {
 
 interface MenuItem {
     title: string;
-    icon: React.ReactNode;
+    icon: ReactElement;
     active?: boolean;
 }
 

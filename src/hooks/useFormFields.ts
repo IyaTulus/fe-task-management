@@ -11,8 +11,8 @@ interface UseFormFieldsReturn {
     // Functions
     fetchFields: () => Promise<void>;
     createField: (data: Omit<FormField, "id">) => Promise<FormField>;
-    updateField: (id: string, data: Partial<FormField>) => Promise<FormField>;
-    deleteField: (id: string) => Promise<void>;
+    updateField: (id: number, data: Partial<FormField>) => Promise<FormField>;
+    deleteField: (id: number) => Promise<void>;
     reorderFields: (fields: FormField[]) => Promise<void>;
 }
 
@@ -55,7 +55,7 @@ export function useFormFields(): UseFormFieldsReturn {
     }, []);
 
     // Update field
-    const updateField = useCallback(async (id: string, data: Partial<FormField>) => {
+    const updateField = useCallback(async (id: number, data: Partial<FormField>) => {
         setLoading(true);
         setError(null);
 
@@ -72,7 +72,7 @@ export function useFormFields(): UseFormFieldsReturn {
     }, []);
 
     // Delete field
-    const deleteField = useCallback(async (id: string) => {
+    const deleteField = useCallback(async (id: number) => {
         setLoading(true);
         setError(null);
 
