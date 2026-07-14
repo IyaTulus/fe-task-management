@@ -1,263 +1,406 @@
-import type { FormEntry, PaginatedResponse, GetEntriesParams } from "../types";
+import axios from "axios";
+import type {
+  Task,
+  GetTasksResponse,
+  CustomFieldDefinition,
+  CustomFieldInput,
+  GetFormsResponse,
+  TableColumn,
+  TaskEntry,
+} from "../types";
 
-const sampleEntries: FormEntry[] = [
-    {
-        id: "entry-1",
-        form_id: 1,
-        values: {
-            "Task Name": "Website Redesign",
-            Description: "Redesign company website with new branding",
-            Status: "In Progress",
-            Priority: "High",
-        },
-        createdat: "2024-02-01T00:00:00Z",
-        updatedat: "2024-02-10T00:00:00Z",
-    },
-    {
-        id: "entry-2",
-        form_id: 1,
-        values: {
-            "Task Name": "API Integration",
-            Description: "Integrate third-party payment API",
-            Status: "Completed",
-            Priority: "Medium",
-        },
-        createdat: "2024-02-02T00:00:00Z",
-        updatedat: "2024-02-10T00:00:00Z",
-    },
-    {
-        id: "entry-3",
-        form_id: 1,
-        values: {
-            "Task Name": "Database Migration",
-            Description: "Migrate from MySQL to PostgreSQL",
-            Status: "In Progress",
-            Priority: "High",
-        },
-        createdat: "2024-02-03T00:00:00Z",
-        updatedat: "2024-02-15T00:00:00Z",
-    },
-    {
-        id: "entry-4",
-        form_id: 1,
-        values: {
-            "Task Name": "UI Testing",
-            Description: "Write comprehensive UI tests",
-            Status: "Not Started",
-            Priority: "Low",
-        },
-        createdat: "2024-02-04T00:00:00Z",
-        updatedat: "2024-02-04T00:00:00Z",
-    },
-    {
-        id: "entry-5",
-        form_id: 1,
-        values: {
-            "Task Name": "Performance Optimization",
-            Description: "Optimize database queries and caching",
-            Status: "In Progress",
-            Priority: "High",
-        },
-        createdat: "2024-02-05T00:00:00Z",
-        updatedat: "2024-02-12T00:00:00Z",
-    },
-    {
-        id: "entry-6",
-        form_id: 1,
-        values: {
-            "Task Name": "Documentation Update",
-            Description: "Update API documentation",
-            Status: "Completed",
-            Priority: "Medium",
-        },
-        createdat: "2024-02-06T00:00:00Z",
-        updatedat: "2024-02-08T00:00:00Z",
-    },
-    {
-        id: "entry-7",
-        form_id: 1,
-        values: {
-            "Task Name": "Security Audit",
-            Description: "Conduct security review",
-            Status: "Not Started",
-            Priority: "High",
-        },
-        createdat: "2024-02-07T00:00:00Z",
-        updatedat: "2024-02-07T00:00:00Z",
-    },
-    {
-        id: "entry-8",
-        form_id: 1,
-        values: {
-            "Task Name": "Code Review",
-            Description: "Review pull requests",
-            Status: "In Progress",
-            Priority: "Medium",
-        },
-        createdat: "2024-02-08T00:00:00Z",
-        updatedat: "2024-02-15T00:00:00Z",
-    },
-    {
-        id: "entry-9",
-        form_id: 1,
-        values: {
-            "Task Name": "Deployment Setup",
-            Description: "Setup CI/CD pipeline",
-            Status: "Completed",
-            Priority: "Low",
-        },
-        createdat: "2024-02-09T00:00:00Z",
-        updatedat: "2024-02-05T00:00:00Z",
-    },
-    {
-        id: "entry-10",
-        form_id: 1,
-        values: {
-            "Task Name": "User Feedback Analysis",
-            Description: "Analyze user feedback and create report",
-            Status: "Not Started",
-            Priority: "Medium",
-        },
-        createdat: "2024-02-10T00:00:00Z",
-        updatedat: "2024-02-10T00:00:00Z",
-    },
+// ============================================
+// API Client Setup
+// ============================================
+
+const API_BASE_URL = import.meta.env.VITE_SERVICE_API_URL || "/api";
+const ORGANIZATION_ID = import.meta.env.VITE_ORGANIZATION_ID;
+
+console.log("🔧 Service Config:", { API_BASE_URL, ORGANIZATION_ID });
+
+const apiClient = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    "Content-Type": "application/json",
+  },
+  // Important: withCredentials needed for CORS
+  withCredentials: false,
+});
+
+// ============================================
+// Types for API Response
+// ============================================
+
+interface ApiTaskFilters {
+  search: string | null;
+  status: string | null;
+  dueDate: string | null;
+  priority: string | null;
+  order_by: string;
+  sort_by: "ASC" | "DESC";
+  limit: number;
+  page: number;
+}
+
+interface ApiGetTasksResponse {
+  data: Task[];
+  total: number;
+  filters: ApiTaskFilters;
+}
+
+// ============================================
+// Default Table Columns
+// ============================================
+
+const DEFAULT_COLUMNS: TableColumn[] = [
+  { id: "title", name: "Title", type: "text", order: 1, isRequired: true, isCustom: false },
+  { id: "description", name: "Description", type: "text", order: 2, isRequired: false, isCustom: false },
+  { id: "dueDate", name: "Due Date", type: "datetime", order: 3, isRequired: false, isCustom: false },
+  { id: "priority", name: "Priority", type: "text", order: 4, isRequired: false, isCustom: false },
+  { id: "status", name: "Status", type: "text", order: 5, isRequired: false, isCustom: false },
+  { id: "tags", name: "Tags", type: "text", order: 6, isRequired: false, isCustom: false },
 ];
 
-const USE_MOCK = true;
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3000";
+// ============================================
+// Form Service (GetForms API)
+// ============================================
 
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+export const formService = {
+  /**
+   * Get custom field definitions from GetForms API
+   * Returns empty array if no custom fields or API fails
+   */
+  async getFields(): Promise<CustomFieldDefinition[]> {
+    if (!ORGANIZATION_ID) {
+      console.warn("Cannot fetch forms: organizationId is missing");
+      return [];
+    }
 
-// Helper to generate unique ID
-const generateId = () => `entry-${Date.now()}`;
+    try {
+      const response = await apiClient.get<GetFormsResponse>(
+        `/GetForms/${ORGANIZATION_ID}`
+      );
+      return response.data?.data ?? response.data ?? [];
+    } catch (error) {
+      console.error("Failed to fetch forms:", error);
+      return [];
+    }
+  },
 
-export const entryService = {
-    async getEntries(params: GetEntriesParams = {}): Promise<PaginatedResponse<FormEntry>> {
-        if (USE_MOCK) {
-            await delay(500);
-            const { page = 1, pageSize = 10, search = "" } = params;
+  /**
+   * Create a new form field
+   */
+  async createField(data: {
+    label: string;
+    type: "text" | "email" | "datetime" | "number" | "checkbox";
+    is_required: boolean;
+    is_active: boolean;
+  }): Promise<CustomFieldDefinition> {
+    if (!ORGANIZATION_ID) {
+      throw new Error("organizationId is missing");
+    }
 
-            let filtered = [...sampleEntries];
+    const payload = {
+      organizationId: ORGANIZATION_ID,
+      ...data,
+    };
 
-            // Search in all values
-            if (search) {
-                const searchLower = search.toLowerCase();
-                filtered = filtered.filter((entry) =>
-                    Object.values(entry.values).some((val) =>
-                        String(val).toLowerCase().includes(searchLower)
-                    )
-                );
-            }
+    const response = await apiClient.post<CustomFieldDefinition>("/InsertForm", payload);
+    return response.data;
+  },
 
-            // Pagination
-            const total = filtered.length;
-            const totalPages = Math.ceil(total / pageSize);
-            const start = (page - 1) * pageSize;
-            const end = start + pageSize;
-            const data = filtered.slice(start, end);
+  /**
+   * Update an existing form field
+   */
+  async updateField(
+    fieldId: string,
+    data: {
+      label?: string;
+      type?: "text" | "email" | "datetime" | "number" | "checkbox";
+      order?: number;
+      is_required?: boolean;
+      is_active?: boolean;
+    }
+  ): Promise<CustomFieldDefinition> {
+    if (!ORGANIZATION_ID) {
+      throw new Error("organizationId is missing");
+    }
 
-            return { data, meta: { total, page, pageSize, totalPages } };
-        }
+    const payload = {
+      organizationId: ORGANIZATION_ID,
+      ...data,
+    };
 
-        const query = new URLSearchParams();
-        if (params.page) query.set("page", String(params.page));
-        if (params.pageSize) query.set("pageSize", String(params.pageSize));
-        if (params.search) query.set("search", params.search);
+    const response = await apiClient.put<CustomFieldDefinition>(
+      `/UpdateForm/${fieldId}`,
+      payload
+    );
+    return response.data;
+  },
 
-        const response = await fetch(`${API_BASE}/value_form?${query.toString()}`);
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        return response.json();
-    },
+  /**
+   * Update form field order
+   */
+  async updateFieldOrder(orderIds: string[]): Promise<void> {
+    if (!ORGANIZATION_ID) {
+      throw new Error("organizationId is missing");
+    }
 
-    async getEntry(id: string): Promise<FormEntry | null> {
-        if (USE_MOCK) {
-            await delay(300);
-            return sampleEntries.find((e) => e.id === id) || null;
-        }
+    await apiClient.patch("/UpdateFormOrder", {
+      organizationId: ORGANIZATION_ID,
+      orderIds,
+    });
+  },
 
-        const response = await fetch(`${API_BASE}/value_form/${id}`);
-        if (!response.ok) {
-            if (response.status === 404) return null;
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return response.json();
-    },
-
-    async createEntry(data: Omit<FormEntry, "id" | "createdat" | "updatedat">): Promise<FormEntry> {
-        if (USE_MOCK) {
-            await delay(500);
-            const newEntry: FormEntry = {
-                ...data,
-                id: generateId(),
-                createdat: new Date().toISOString(),
-                updatedat: new Date().toISOString(),
-            };
-            sampleEntries.unshift(newEntry);
-            return newEntry;
-        }
-
-        const response = await fetch(`${API_BASE}/value_form`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(data),
-        });
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        return response.json();
-    },
-
-    async updateEntry(id: string, data: Partial<Omit<FormEntry, "id" | "createdat" | "updatedat">>): Promise<FormEntry> {
-        if (USE_MOCK) {
-            await delay(500);
-            const index = sampleEntries.findIndex((e) => e.id === id);
-            if (index === -1) throw new Error("Entry tidak ditemukan");
-
-            sampleEntries[index] = {
-                ...sampleEntries[index],
-                ...data,
-                updatedat: new Date().toISOString(),
-            };
-            return sampleEntries[index];
-        }
-
-        const response = await fetch(`${API_BASE}/value_form/${id}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(data),
-        });
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        return response.json();
-    },
-
-    async deleteEntry(id: string): Promise<void> {
-        if (USE_MOCK) {
-            await delay(300);
-            const index = sampleEntries.findIndex((e) => e.id === id);
-            if (index !== -1) sampleEntries.splice(index, 1);
-            return;
-        }
-
-        const response = await fetch(`${API_BASE}/value_form/${id}`, { method: "DELETE" });
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-    },
-
-    async deleteEntries(ids: string[]): Promise<void> {
-        if (USE_MOCK) {
-            await delay(500);
-            ids.forEach((id) => {
-                const index = sampleEntries.findIndex((e) => e.id === id);
-                if (index !== -1) sampleEntries.splice(index, 1);
-            });
-            return;
-        }
-
-        const response = await fetch(`${API_BASE}/value_form/batch-delete`, {
-            method: "DELETE",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ids }),
-        });
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-    },
+  /**
+   * Transform CustomFieldDefinition to TableColumn
+   * Only includes active fields
+   */
+  transformToColumns(definitions: CustomFieldDefinition[]): TableColumn[] {
+    return definitions
+      .filter((def) => def.is_active)
+      .map((def) => ({
+        id: def.id,
+        name: def.label,
+        type: def.type,
+        order: def.formOrder,
+        isRequired: def.is_required,
+        isCustom: true,
+      }))
+      .sort((a, b) => a.order - b.order);
+  },
 };
 
-// Backward compatibility alias
-export const taskService = entryService;
+// ============================================
+// Task Service (GetTasks API)
+// ============================================
+
+export interface TaskFilters {
+  search?: string;
+  status?: string;
+  dueDate?: string;
+  priority?: string;
+  order_by?: "createdAt" | "updatedAt" | "title" | "dueDate" | "priority" | "status";
+  sort_by?: "ASC" | "DESC";
+}
+
+export const taskService = {
+  /**
+   * Get tasks from GetTasks API
+   * Endpoint: /GetTasks?organizationId=...&search=&status=&dueDate=&priority=&order_by=&sort_by=&limit=
+   */
+  async getTasks(params?: {
+    page?: number;
+    pageSize?: number;
+    filters?: TaskFilters;
+  }): Promise<GetTasksResponse> {
+    const page = params?.page ?? 1;
+    const pageSize = params?.pageSize ?? 10;
+    const filters = params?.filters;
+
+    if (!ORGANIZATION_ID) {
+      console.warn("Cannot fetch tasks: organizationId is missing");
+      return { data: [], meta: { total: 0, page, pageSize } };
+    }
+
+    try {
+      console.log("🌐 Making API request to:", `/GetTasks`, {
+        params: {
+          organizationId: ORGANIZATION_ID,
+          search: filters?.search || "",
+          status: filters?.status || "",
+          dueDate: filters?.dueDate || "",
+          priority: filters?.priority || "",
+          order_by: filters?.order_by || "createdAt",
+          sort_by: filters?.sort_by || "ASC",
+          limit: pageSize,
+          page,
+        },
+      });
+
+      const response = await apiClient.get<ApiGetTasksResponse>("/GetTasks", {
+        params: {
+          organizationId: ORGANIZATION_ID,
+          search: filters?.search || "",
+          status: filters?.status || "",
+          dueDate: filters?.dueDate || "",
+          priority: filters?.priority || "",
+          order_by: filters?.order_by || "createdAt",
+          sort_by: filters?.sort_by || "ASC",
+          limit: pageSize,
+          page,
+        },
+      });
+
+      console.log("📨 API Response:", response);
+      console.log("📦 Response data:", response.data);
+      console.log("📊 Task count:", response.data?.data?.length);
+      console.log("🔢 Total:", response.data?.total);
+
+      return {
+        data: response.data?.data ?? [],
+        meta: {
+          total: response.data?.total ?? 0,
+          page: response.data?.filters?.page ?? page,
+          pageSize: response.data?.filters?.limit ?? pageSize,
+          filters: response.data?.filters,
+        },
+      };
+    } catch (error) {
+      console.error("Failed to fetch tasks:", error);
+      return { data: [], meta: { total: 0, page, pageSize } };
+    }
+  },
+
+  /**
+   * Transform Task to TaskEntry for table display
+   */
+  transformToEntry(task: Task): TaskEntry {
+    // Handle tags - could be array or string
+    let tagsStr = "";
+    if (Array.isArray(task.tags)) {
+      tagsStr = task.tags.join(", ");
+    } else if (typeof task.tags === "string") {
+      tagsStr = task.tags;
+    }
+
+    const values: Record<string, string | number | boolean> = {
+      id: task.id,
+      title: task.title || "",
+      description: task.description || "",
+      dueDate: task.dueDate || "",
+      priority: task.priority || "",
+      status: task.status || "",
+      tags: tagsStr,
+    };
+
+    // Add custom field values - handle both array and object formats
+    if (task.customFields) {
+      if (Array.isArray(task.customFields)) {
+        // Array format: [{fieldId, label, value}, ...]
+        for (const cf of task.customFields) {
+          values[cf.label] = cf.value;
+        }
+      } else if (typeof task.customFields === "object") {
+        // Object format: {Phone: "123", Email: "test@example.com"}
+        for (const [key, val] of Object.entries(task.customFields)) {
+          values[key] = val as string | number | boolean;
+        }
+      }
+    }
+
+    return {
+      id: task.id,
+      values,
+      _task: task,
+    };
+  },
+
+  /**
+   * Create a new task
+   */
+  async createTask(data: {
+    title: string;
+    description: string;
+    dueDate: string;
+    priority: string;
+    status: string;
+    tags: string[];
+    customFields?: CustomFieldInput[];
+  }): Promise<Task> {
+    if (!ORGANIZATION_ID) {
+      throw new Error("organizationId is missing");
+    }
+
+    const payload = {
+      organizationId: ORGANIZATION_ID,
+      title: data.title,
+      description: data.description,
+      dueDate: data.dueDate,
+      priority: data.priority,
+      status: data.status,
+      tags: data.tags,
+      customFields: data.customFields,
+    };
+
+    console.log("📤 Creating task:", payload);
+
+    const response = await apiClient.post<Task>("/InsertTask", payload);
+    return response.data;
+  },
+
+  /**
+   * Update an existing task
+   */
+  async updateTask(
+    taskId: string,
+    data: {
+      title?: string;
+      description?: string;
+      dueDate?: string;
+      priority?: string;
+      status?: string;
+      tags?: string[];
+      customFields?: CustomFieldInput[];
+    }
+  ): Promise<Task> {
+    if (!ORGANIZATION_ID) {
+      throw new Error("organizationId is missing");
+    }
+
+    const payload = {
+      organizationId: ORGANIZATION_ID,
+      title: data.title,
+      description: data.description,
+      dueDate: data.dueDate,
+      priority: data.priority,
+      status: data.status,
+      tags: data.tags,
+      customFields: data.customFields,
+    };
+
+    console.log("📤 Updating task:", taskId, payload);
+
+    const response = await apiClient.put<Task>(
+      `/UpdateTask/${taskId}`,
+      payload
+    );
+    return response.data;
+  },
+
+  /**
+   * Delete a task
+   */
+  async deleteTask(taskId: string): Promise<void> {
+    if (!ORGANIZATION_ID) {
+      throw new Error("organizationId is missing");
+    }
+
+    await apiClient.delete(`/DeleteTask/${taskId}`, {
+      params: { organizationId: ORGANIZATION_ID },
+    });
+  },
+};
+
+// ============================================
+// Export default columns
+// ============================================
+
+export const getDefaultColumns = (): TableColumn[] => [...DEFAULT_COLUMNS];
+
+export const mergeColumns = (
+  defaultCols: TableColumn[],
+  customCols: TableColumn[]
+): TableColumn[] => {
+  console.log("🔧 mergeColumns - defaultCols:", defaultCols.length, "customCols:", customCols.length);
+  console.log("🔧 customCols detail:", customCols);
+
+  // Custom fields start after default columns
+  const maxDefaultOrder = Math.max(...defaultCols.map((c) => c.order));
+  const adjustedCustomCols = customCols.map((c) => ({
+    ...c,
+    order: c.order + maxDefaultOrder,
+  }));
+
+  return [...defaultCols, ...adjustedCustomCols];
+};

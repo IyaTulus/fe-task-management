@@ -14,6 +14,8 @@ import {
     Option,
     Spinner,
     Text,
+    Tag,
+    TagGroup,
 } from "@fluentui/react-components";
 import {
     Search24Regular,
@@ -24,10 +26,12 @@ import {
     ChevronRight24Filled,
     Dismiss16Regular,
 } from "@fluentui/react-icons";
-import type { FormConfig, FormEntry } from "../../types";
+import type { TaskEntry, TableColumn } from "../../types";
 
 const formatDate = (dateString: string): string => {
+    if (!dateString) return "-";
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) return "-";
     return date.toLocaleDateString("en-US", {
         month: "short",
         day: "numeric",
@@ -35,8 +39,31 @@ const formatDate = (dateString: string): string => {
     });
 };
 
-const getStatusBadgeColor = (status: string): "success" | "subtle" => {
-    return status === "Completed" ? "success" : "subtle";
+const getStatusBadgeColor = (status: string): "success" | "subtle" | "important" | "informative" => {
+    switch (status?.toLowerCase()) {
+        case "completed":
+            return "success";
+        case "in-progress":
+        case "in_progress":
+            return "informative";
+        case "high":
+            return "important";
+        default:
+            return "subtle";
+    }
+};
+
+const getPriorityBadgeColor = (priority: string): "important" | "subtle" | "success" => {
+    switch (priority?.toLowerCase()) {
+        case "high":
+            return "important";
+        case "medium":
+            return "subtle";
+        case "low":
+            return "success";
+        default:
+            return "subtle";
+    }
 };
 
 const tableHeaderClasses = "bg-[#f5f5f5] font-semibold text-[#605e5c] text-xs uppercase tracking-wide text-left";
@@ -44,8 +71,8 @@ const tableCellClasses = "text-sm text-[#323130]";
 
 interface TaskTableProps {
     // Data
-    entries?: FormEntry[];
-    columns?: FormConfig[];
+    entries?: TaskEntry[];
+    columns?: TableColumn[];
 
     // Pagination
     totalCount?: number;
@@ -57,8 +84,8 @@ interface TaskTableProps {
     onPageChange?: (page: number) => void;
     onPageSizeChange?: (pageSize: number) => void;
     onSearch?: (query: string) => void;
-    onEdit?: (entry: FormEntry) => void;
-    onDelete?: (entry: FormEntry) => void;
+    onEdit?: (entry: TaskEntry) => void;
+    onDelete?: (entry: TaskEntry) => void;
     onSelectionChange?: (selectedIds: string[]) => void;
 }
 
@@ -76,6 +103,16 @@ export default function TaskTable({
     onDelete,
     onSelectionChange,
 }: TaskTableProps) {
+    // Debug logging
+    console.log("🔍 Table Props - entries:", entries?.length, "columns:", columns?.length);
+    if (entries?.length > 0) {
+        console.log("🔍 First entry values:", entries[0].values);
+        console.log("🔍 First entry customFields:", entries[0]._task.customFields);
+    }
+    if (columns?.length > 0) {
+        console.log("🔍 Columns:", columns.map(c => ({ id: c.id, name: c.name, isCustom: c.isCustom })));
+    }
+
     // Local state
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -137,45 +174,76 @@ export default function TaskTable({
         }
     };
 
-    const renderCell = (column: FormConfig, entry: FormEntry) => {
-        const value = entry.values[column.name];
+    const renderCell = (column: TableColumn, entry: TaskEntry) => {
+        // For default fields: values use lowercase id (title, description, etc.)
+        // For custom fields: values use label (Phone, Email, etc.)
+        // Try both keys to be safe
+        const value = entry.values[column.id] ?? entry.values[column.name];
 
-        switch (column.name) {
-            case "Task Name":
+        switch (column.id) {
+            case "title":
                 return (
                     <span className={`${tableCellClasses} font-medium`}>
                         {String(value ?? "-")}
                     </span>
                 );
 
-            case "Description":
+            case "description":
                 return (
                     <span className={`${tableCellClasses} line-clamp-2 max-w-xs`}>
                         {String(value ?? "-")}
                     </span>
                 );
 
-            case "Status":
+            case "status":
                 return (
                     <Badge
-                        className="rounded-full px-3 py-0.5 text-xs font-medium"
+                        className="rounded-full px-3 py-0.5 text-xs font-medium capitalize"
                         appearance="filled"
                         color={getStatusBadgeColor(String(value))}
+                    >
+                        {String(value ?? "-").replace("-", " ")}
+                    </Badge>
+                );
+
+            case "priority":
+                return (
+                    <Badge
+                        className="rounded-full px-3 py-0.5 text-xs font-medium capitalize"
+                        appearance="filled"
+                        color={getPriorityBadgeColor(String(value))}
                     >
                         {String(value ?? "-")}
                     </Badge>
                 );
 
-            case "Created At":
-            case "Updated At":
+            case "dueDate":
                 return (
                     <span className={tableCellClasses}>
                         {value ? formatDate(String(value)) : "-"}
                     </span>
                 );
 
+            case "tags": {
+                // Tags is stored as comma-separated string
+                const tags = String(value ?? "")
+                    .split(",")
+                    .map((t) => t.trim())
+                    .filter((t) => t);
+                if (tags.length === 0) return <span className={tableCellClasses}>-</span>;
+                return (
+                    <TagGroup className="flex flex-wrap gap-1">
+                        {tags.map((tag, idx) => (
+                            <Tag key={idx} size="small" appearance="brand">
+                                {tag}
+                            </Tag>
+                        ))}
+                    </TagGroup>
+                );
+            }
+
             default:
-                // Dynamic fields
+                // Custom fields or other dynamic fields
                 if (column.type === "email" && value) {
                     return <Link href={`mailto:${value}`}>{String(value)}</Link>;
                 }
@@ -198,7 +266,7 @@ export default function TaskTable({
                 <div className="w-64">
                     <Input
                         contentBefore={<Search24Regular />}
-                        placeholder="Search"
+                        placeholder="Search tasks..."
                         value={searchQuery}
                         onChange={(_e, data) => handleSearch(data.value)}
                         className="w-full"

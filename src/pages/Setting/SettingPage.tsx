@@ -1,9 +1,5 @@
-
+import FormSettings from "../../components/Setting/FormSettings";
 
 export default function SettingsPage() {
-    return (
-        <div>
-            <h1>Settings</h1>
-        </div>
-    );
+    return <FormSettings />;
 }

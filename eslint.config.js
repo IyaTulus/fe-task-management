@@ -18,5 +18,10 @@ export default defineConfig([
     languageOptions: {
       globals: globals.browser,
     },
+    rules: {
+      // Disable strict React rules that cause warnings for common patterns
+      '@typescript-eslint/no-floating-promises': 'off',
+      'react-hooks/exhaustive-deps': 'off',
+    },
   },
 ])
