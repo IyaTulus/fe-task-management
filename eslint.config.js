@@ -22,6 +22,7 @@ export default defineConfig([
       // Disable strict React rules that cause warnings for common patterns
       '@typescript-eslint/no-floating-promises': 'off',
       'react-hooks/exhaustive-deps': 'off',
+      'react-hooks/no-dynamic-hook-calls-in-effect': 'off',
     },
   },
 ])

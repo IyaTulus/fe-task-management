@@ -145,14 +145,18 @@ function SortableRow({
 
             {/* Active Status */}
             <TableCell className="w-32">
-                <Switch
-                    checked={field.is_active}
-                    onChange={(_, checked) => onToggleActive(field, !!checked)}
-                    size="small"
-                />
-                <span className={`ml-2 text-sm ${field.is_active ? "text-green-600" : "text-[#605e5c]"}`}>
-                    {field.is_active ? "Active" : "Inactive"}
-                </span>
+                <div className="flex items-center gap-2">
+                    <Switch
+                        checked={field.is_active}
+                        onChange={(_, data) => {
+                            onToggleActive(field, data.checked as boolean);
+                        }}
+                        size="medium"
+                    />
+                    <span className={`text-sm ${field.is_active ? "text-green-600" : "text-[#605e5c]"}`}>
+                        {field.is_active ? "Active" : "Inactive"}
+                    </span>
+                </div>
             </TableCell>
 
             {/* Order Actions */}
@@ -202,7 +206,7 @@ function SortableRow({
 
 interface FieldFormData {
     label: string;
-    type: "text" | "email" | "datetime" | "number" | "checkbox";
+    type: "text" | "email" | "datetime";
     is_required: boolean;
     is_active: boolean;
 }
@@ -346,6 +350,7 @@ export default function FormSettings() {
 
     // Handle toggle active
     const handleToggleActive = async (field: CustomFieldDefinition, isActive: boolean) => {
+        console.log("Toggling field:", field.id, "to:", isActive);
         try {
             await formService.updateField(field.id, { is_active: isActive });
             setFields((prev) =>
@@ -481,8 +486,6 @@ export default function FormSettings() {
                                         <Option value="text">Text</Option>
                                         <Option value="email">Email</Option>
                                         <Option value="datetime">Date/Time</Option>
-                                        <Option value="number">Number</Option>
-                                        <Option value="checkbox">Checkbox</Option>
                                     </Dropdown>
                                 </Field>
 
@@ -497,10 +500,10 @@ export default function FormSettings() {
                                         </div>
                                         <Switch
                                             checked={formData.is_required}
-                                            onChange={(_, checked) =>
+                                            onChange={(_, data) =>
                                                 setFormData((prev) => ({
                                                     ...prev,
-                                                    is_required: !!checked,
+                                                    is_required: data.checked as boolean,
                                                 }))
                                             }
                                         />
@@ -515,10 +518,10 @@ export default function FormSettings() {
                                         </div>
                                         <Switch
                                             checked={formData.is_active}
-                                            onChange={(_, checked) =>
+                                            onChange={(_, data) =>
                                                 setFormData((prev) => ({
                                                     ...prev,
-                                                    is_active: !!checked,
+                                                    is_active: data.checked as boolean,
                                                 }))
                                             }
                                         />
